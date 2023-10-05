@@ -21,6 +21,16 @@ public class PrestamoServiceImpl implements PrestamoService{
     public PrestamoServiceImpl(PrestamoRepository prestamoRepository) {
         this.prestamoRepository = prestamoRepository;
     }
+@Override
+    public DatosClienteRequest getParams(Integer moneda, String numeroDocumento, Integer paisDocumento, Integer tipoDocumento, Integer cuenta) throws Exception{
+    DatosClienteRequest request = new DatosClienteRequest();
+    request.setMoneda(moneda);
+    request.setNumeroDocumento(numeroDocumento);
+    request.setPaisDocumento(paisDocumento);
+    request.setTipoDocumento(tipoDocumento);
+    request.setCuenta(cuenta);
+    return request;
+}
 
     @Override
     public PrestamosPersona consultarPrestamo(DatosClienteRequest request) throws Exception {
