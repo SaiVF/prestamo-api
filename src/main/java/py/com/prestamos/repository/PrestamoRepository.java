@@ -151,6 +151,7 @@ public class PrestamoRepository extends JdbcDaoSupport {
                         datoscliente.setCodError(codError);
                         datoscliente.setMensaje(menError);
 
+                        logger.info("Datos del cliente: " + datoscliente);
                         return datoscliente;
                     }
             );
