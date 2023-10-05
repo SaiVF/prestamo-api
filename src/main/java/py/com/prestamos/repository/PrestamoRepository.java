@@ -7,13 +7,12 @@ import org.springframework.jdbc.core.support.JdbcDaoSupport;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 import py.com.prestamos.mapper.DatoPrestamoRowMapper;
-import py.com.prestamos.model.ConsultaCliente;
-import py.com.prestamos.model.DatoPrestamo;
-import py.com.prestamos.model.DatosCliente;
-import py.com.prestamos.model.PrestamosPersona;
+import py.com.prestamos.mapper.PrestamoCuotaRowMapper;
+import py.com.prestamos.model.*;
+import py.com.prestamos.request.ConsultaPorDocumentoRequest;
+import py.com.prestamos.request.ConsultaPrestamoDetalleCuotasRequest;
 import py.com.prestamos.request.DatosClienteRequest;
-import py.com.prestamos.response.DeudaVencida;
-import py.com.prestamos.response.OperacionesPrestamoResponse;
+import py.com.prestamos.response.*;
 
 import javax.sql.DataSource;
 import java.math.BigDecimal;
@@ -57,9 +56,25 @@ public class PrestamoRepository extends JdbcDaoSupport {
             "   and nvl(pre.en_juicio,'N') = 'N'" +
             "   and per.cod_persona = ?";
 
-//    public List<DatoPrestamo> getPrestamoDocumento(DatosClienteRequest request){
-//        return null;
-//    }
+    public static final String SQL_OBT_CUOTAS_PRESTAMO = "select to_char(cuo.nro_cuota) cuota, " +
+            "cuo.fec_vencimiento fec_vto, " +
+            "nvl(cuo.mto_capital, 0) + nvl(cuo.mto_interes, 0) monto_pagar " +
+            "from pr_cta_prestamos pre, " +
+            "ge_cta_clientes  cli, " +
+            "ba_personas      per, " +
+            "pr_cuotas        cuo " +
+            "where pre.cod_modulo = 6 " +
+            "and pre.estado <> 'N' " +
+            "and pre.nro_cuenta = cli.nro_cuenta " +
+            "and cli.relacion = 'P' " +
+            "and cuo.estado != 'N' " +
+            "and cuo.nro_cuota > 0 " +
+            "and cli.cod_persona = per.cod_persona " +
+            "and pre.nro_cuenta = cuo.nro_cuenta " +
+            "and  cuo.nro_cuenta = ?";
+
+    private static final String SQL_FECHA_APERTURA = "SELECT IT.PAG_CAL.FU_OBT_FEC_ACTUAL(1) FROM DUAL";
+
     public List<DatoPrestamo> getPrestamoDocumento(String codPersona, String codMoneda) {
         try {
 
@@ -163,7 +178,6 @@ public class PrestamoRepository extends JdbcDaoSupport {
             logger.error("Ocurrio un error al obtener los datos del cliente :( ", e);
             return null;
         }
-
     }
 
     public String obtenerMonedaBcp(Integer codMoneda) {
@@ -254,5 +268,119 @@ public class PrestamoRepository extends JdbcDaoSupport {
             logger.error("Error al parsear la fecha de vencimiento {}");
             throw new SQLDataException();
         }
+    }
+
+    public OperacionesPrestamoResponse obtenerPrestamoDocumento(ConsultaPorDocumentoRequest documento, Integer moneda) throws SQLDataException {
+        OperacionesPrestamoResponse operacionesPrestamoResponse = new OperacionesPrestamoResponse();
+        List<PrestamoOperacionDTO> listOpDTO = new ArrayList<>();
+        ConsultaCliente consultaCliente = new ConsultaCliente();
+        consultaCliente.setCodigoPais(documento.getCodigoPais());
+        consultaCliente.setCodigoTipo(documento.getCodigoTipoDoc());
+        consultaCliente.setNroDocumento(documento.getNumeroDocumento());
+        DatosCliente datosCliente = this.obtenerDatoscliente(consultaCliente);
+        if (datosCliente == null) {
+            throw new SQLDataException("Error al obtener datos del cliente para obtener datos de prestamo");
+        }
+        String mon = obtenerMonedaBcp(moneda);
+
+        /* Obtenemos datos del prestamo */
+        List<DatoPrestamo> listPrestamo;
+        try {
+            listPrestamo = getJdbcTemplate().query(SQL_OBTENER_PRESTAMO_POR_DOCUMENTO, new DatoPrestamoRowMapper(), mon, mon, datosCliente.getCodPersona());
+        } catch (DataAccessException e) {
+            logger.error("Ocurrio un error al obtener datos de prestamo", e);
+            throw new SQLDataException("Ocurrio un error al obtener datos de prestamos");
+        }
+
+        operacionesPrestamoResponse.setNombre(datosCliente.getPrimerNombre() + " " + (datosCliente.getSegundoNombre() != null ? datosCliente.getSegundoNombre() : ""));
+        operacionesPrestamoResponse.setApellido(datosCliente.getPrimerApellido() + " " + (datosCliente.getSegundoApellido() != null ? datosCliente.getSegundoApellido() : ""));
+
+        for (DatoPrestamo p : listPrestamo) {
+            DeudaVencida deudaVencida;
+            try {
+                deudaVencida = this.getDeudaVencidaByNroCuentaAndMoneda(p.getNroPrestamo(), moneda);
+            } catch (SQLDataException throwables) {
+                throw new SQLDataException("Ocurrio un error al obtener la deuda vencia");
+            }
+            PrestamoOperacionDTO prestamoOperacionDTO = new PrestamoOperacionDTO();
+            prestamoOperacionDTO.setNumeroOperacion(Long.valueOf(p.getNroPrestamo()));
+            prestamoOperacionDTO.setMonedaLetras(p.getMoneda());
+            prestamoOperacionDTO.setMoneda(moneda);
+            prestamoOperacionDTO.setFechaVencimiento(deudaVencida.getFechaVencimiento());
+            prestamoOperacionDTO.setSaldo(deudaVencida.getMontoTotalCobrar());
+            listOpDTO.add(prestamoOperacionDTO);
+        }
+        operacionesPrestamoResponse.setOperaciones(listOpDTO);
+        return operacionesPrestamoResponse;
+    }
+
+    public PrestamoDetalleDTO obtenerCuotasPrestamo(ConsultaPrestamoDetalleCuotasRequest request) throws Exception {
+        PrestamoDetalleDTO prestamoDetalleDTO = new PrestamoDetalleDTO();
+        List<PrestamoCuota> listCuota = null;
+        List<PrestamoCuotaDTO> listPmoDTO = new ArrayList<PrestamoCuotaDTO>();
+        try {
+            listCuota = getJdbcTemplate().query(SQL_OBT_CUOTAS_PRESTAMO, new PrestamoCuotaRowMapper(), request.getNumeroOperacion());
+        } catch (DataAccessException e) {
+            logger.error("Ocurrio un error al obtener cuotas de prestamo", e);
+            throw new Exception("Ocurrio un error al obtener las cuotas del prestamo");
+        }
+
+        for (PrestamoCuota p : listCuota) {
+            PrestamoCuotaDTO prestamoCuotaDTO = new PrestamoCuotaDTO();
+            PrestamoCuotaPrevDTO prestamoCuotaPrevDTO = new PrestamoCuotaPrevDTO();
+            prestamoCuotaPrevDTO.setNumeroCuota(p.getNroCuota());
+            prestamoCuotaPrevDTO.setFechaVencimiento(p.getFecVencimiento());
+            prestamoCuotaPrevDTO.setImporteAPagar(p.getMontoPagar());
+
+            /* Se obtiene el monto a Pagar */
+            String cuoData = obtenerDatosCuota(request.getNumeroOperacion(), p.getNroCuota());
+            String[] cuoDataSplit = cuoData.split(";");
+
+            prestamoCuotaPrevDTO.setImporteAPagar(new BigDecimal(cuoDataSplit[3].replace(",", ".")));
+            prestamoCuotaDTO.setPrev(prestamoCuotaPrevDTO);
+            listPmoDTO.add(prestamoCuotaDTO);
+        }
+        prestamoDetalleDTO.setPrestamoCuotas(listPmoDTO);
+        int cantidadCuotas = obtenerCantidadCuotas(listCuota);
+        prestamoDetalleDTO.setCantidadCuotas(cantidadCuotas);
+        return prestamoDetalleDTO;
+    }
+
+    /**
+     * Metodo para calcular datos de la cuota
+     *
+     * @param nroCuenta
+     * @param nroCuota
+     * @return String
+     */
+    public String obtenerDatosCuota(Long nroCuenta, Integer nroCuota) {
+        final String CALL_CALCULAR_MONTO_CUOTA = "{? = call IT.pap_ser.fu_cal_deu_prestamo(?, ?)}";
+
+        String result = getJdbcTemplate().execute((CallableStatementCreator) con -> {
+            logger.info(CALL_CALCULAR_MONTO_CUOTA);
+            logger.info("params: {}");
+            logger.info("nroCuenta: " + nroCuenta);
+            logger.info("nroCuota: " + nroCuota);
+
+            CallableStatement cStmt = con.prepareCall(CALL_CALCULAR_MONTO_CUOTA);
+            cStmt.registerOutParameter(1, Types.VARCHAR);
+            cStmt.setString(2, "" + nroCuenta);
+            cStmt.setInt(3, nroCuota);
+
+            return cStmt;
+        }, cs -> {
+            cs.execute();
+            return cs.getString(1);
+        });
+        logger.info("resul: " + result);
+        return result;
+    }
+    private int obtenerCantidadCuotas(List<PrestamoCuota> listCuota) {
+        return listCuota.isEmpty() ? 0 : listCuota.get(listCuota.size() - 1).getNroCuota();
+    }
+
+    public Date consultarFechaApertura() {
+        logger.info("Obteniendo fecha de apertura");
+        return getJdbcTemplate().queryForObject(SQL_FECHA_APERTURA, Date.class);
     }
 }

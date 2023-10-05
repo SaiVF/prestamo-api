@@ -5,9 +5,12 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import py.com.prestamos.model.*;
 import py.com.prestamos.repository.PrestamoRepository;
+import py.com.prestamos.request.ConsultaPorDocumentoRequest;
+import py.com.prestamos.request.ConsultaPrestamoDetalleCuotasRequest;
 import py.com.prestamos.request.DatosClienteRequest;
 import py.com.prestamos.response.*;
 
+import java.math.BigDecimal;
 import java.sql.SQLDataException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -23,62 +26,72 @@ public class PrestamoServiceImpl implements PrestamoService{
     }
 
     @Override
-    public PrestamosPersona consultarPrestamo(DatosClienteRequest request) throws Exception {
-        PrestamosPersona response;
-        if(!request.getNumeroDocumento().isEmpty()){
-            log.info("Se realiza la consulta por numero de documento");
-            response = consultarPrestamoPorDocumento(request);
-        }else{
-            log.info("Se realiza la consulta por numero de cuenta");
-            response = consultarPrestamoPorCuenta(request);
-        }
-        return response;
-    }
-
-    private PrestamosPersona consultarPrestamoPorDocumento(DatosClienteRequest request) throws Exception {
-        List<PrestamoOperacionDTO> listOpDTO = new ArrayList<>();
-        OperacionesPrestamoResponse operacionesPrestamoResponse = new OperacionesPrestamoResponse();
-        List<DatoPrestamo> listaPrestamos = null;
-        ConsultaCliente consultaCliente = new ConsultaCliente();
-        consultaCliente.setCodigoPais(request.getPaisDocumento());
-        consultaCliente.setCodigoTipo(request.getTipoDocumento());
-        consultaCliente.setNroDocumento(request.getNumeroDocumento());
-        DatosCliente datosCliente = prestamoRepository.obtenerDatoscliente(consultaCliente);
-        if(datosCliente == null){
-            log.error("Error al obtener datos del cliente");
-            throw new SQLDataException("No se pudo obtener datos del Cliente");
-        }
-        /* Obtenemos la moneda por codigo */
-        String mon = prestamoRepository.obtenerMonedaBcp(request.getMoneda());
-        /* Obtenemos datos del prestamo */
-
+    public PrestamosPersona consultarPrestamoDocumento(Integer paisDocumento, Integer tipoDocumento, String numeroDocumento, Integer moneda) throws Exception {
         try {
-            listaPrestamos = prestamoRepository.getPrestamoDocumento(datosCliente.getCodPersona(), mon);
-        } catch (DataAccessException e) {
-            log.error("Ocurrio un error al obtener datos de prestamo", e);
-        }
-        operacionesPrestamoResponse.setNombre(datosCliente.getPrimerNombre() + " " + (datosCliente.getSegundoNombre() != null ? datosCliente.getSegundoNombre() : ""));
-        operacionesPrestamoResponse.setApellido(datosCliente.getPrimerApellido() + " " + (datosCliente.getSegundoApellido() != null ? datosCliente.getSegundoApellido() : ""));
-
-        for (DatoPrestamo p : listaPrestamos) {
-            DeudaVencida deudaVencida;
-            try {
-                deudaVencida = prestamoRepository.getDeudaVencidaByNroCuentaAndMoneda(p.getNroPrestamo(),request.getMoneda());
-            } catch (SQLDataException throwables) {
-                throw new Exception("Ocurrio un error al obtener la deuda vencida");
+            ConsultaPorDocumentoRequest documento = new ConsultaPorDocumentoRequest();
+            documento.setNumeroDocumento(numeroDocumento);
+            documento.setCodigoPais(paisDocumento);
+            documento.setCodigoTipoDoc(tipoDocumento);
+            OperacionesPrestamoResponse operaciones = this.descartarPrestamosCanceladosAntesCierre(prestamoRepository.obtenerPrestamoDocumento(documento, moneda));
+            ordenarPorFechaVencimiento(operaciones.getOperaciones());
+            consultarPrestamoDetalle(operaciones);
+            if (Objects.nonNull(operaciones.getOperaciones()) && !operaciones.getOperaciones().isEmpty()) {
             }
-            PrestamoOperacionDTO prestamoOperacionDTO = new PrestamoOperacionDTO();
-            prestamoOperacionDTO.setNumeroOperacion(Long.valueOf(p.getNroPrestamo()));
-            prestamoOperacionDTO.setMonedaLetras(p.getMoneda());
-            prestamoOperacionDTO.setMoneda(request.getMoneda());
-            prestamoOperacionDTO.setFechaVencimiento(deudaVencida.getFechaVencimiento());
-            prestamoOperacionDTO.setSaldo(deudaVencida.getMontoTotalCobrar());
-            listOpDTO.add(prestamoOperacionDTO);
+            return parsePrestamoPersona(operaciones);
+        } catch (Exception e) {
+            log.error(e);
+            throw new Exception(e.getMessage());
         }
-        operacionesPrestamoResponse.setOperaciones(listOpDTO);
-        return parsePrestamoPersona(operacionesPrestamoResponse);
     }
-    private PrestamosPersona consultarPrestamoPorCuenta(DatosClienteRequest request){
+
+    private OperacionesPrestamoResponse descartarPrestamosCanceladosAntesCierre(OperacionesPrestamoResponse prestamos){
+        if(prestamos!=null && prestamos.getOperaciones()!=null){
+            List<PrestamoOperacionDTO> noCancelados = new ArrayList<>();
+            for (PrestamoOperacionDTO prestamo : prestamos.getOperaciones()) {
+                if(BigDecimal.ZERO.compareTo(prestamo.getSaldo())!=0){
+                    noCancelados.add(prestamo);
+                }
+            }
+            prestamos.setOperaciones(noCancelados);
+        }
+        return prestamos;
+    }
+    private void ordenarPorFechaVencimiento(List<PrestamoOperacionDTO> prestamos){
+        if(prestamos!=null){
+            Collections.sort(prestamos, Comparator.comparing(o1->o1.getFechaVencimiento()));
+        }
+    }
+
+    private void consultarPrestamoDetalle(OperacionesPrestamoResponse operaciones) throws Exception {
+        Date fechaApertura = getFechaApertura();
+        for (PrestamoOperacionDTO o: operaciones.getOperaciones()) {
+            try {
+                PrestamoDetalleDTO  prestamoDetalle = prestamoRepository.obtenerCuotasPrestamo(buildDetalleRequest(o, fechaApertura));
+                o.setDetalle(prestamoDetalle);
+            } catch (Exception e) {
+                log.error(e);
+                throw new Exception(e.getMessage());
+            }
+        }
+    }
+
+    private Date getFechaApertura() {
+        return prestamoRepository.consultarFechaApertura();
+    }
+    private ConsultaPrestamoDetalleCuotasRequest buildDetalleRequest(PrestamoOperacionDTO prestamoOperacionDTO, Date fechaApertura) throws Exception {
+        ConsultaPrestamoDetalleCuotasRequest rq = new ConsultaPrestamoDetalleCuotasRequest();
+        rq.setFecha(fechaApertura);
+        rq.setModulo(prestamoOperacionDTO.getModulo());
+        rq.setMoneda(prestamoOperacionDTO.getMoneda());
+        rq.setNumeroOperacion(prestamoOperacionDTO.getNumeroOperacion());
+        rq.setPapel(prestamoOperacionDTO.getPapel());
+        rq.setSubOperacion(prestamoOperacionDTO.getSubOperacion());
+        rq.setSucursal(prestamoOperacionDTO.getSucursal());
+        rq.setTipoOperacion(prestamoOperacionDTO.getTipoOperacion());
+        return rq;
+    }
+    @Override
+    public PrestamosPersona consultarPrestamoCuenta(Integer cuenta, Integer moneda) {
         return null;
     }
 
