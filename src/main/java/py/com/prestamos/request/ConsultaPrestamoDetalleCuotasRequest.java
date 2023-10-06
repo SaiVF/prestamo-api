@@ -2,11 +2,11 @@ package py.com.prestamos.request;
 
 import lombok.Data;
 
-import java.util.Date;
+import java.time.LocalDate;
 @Data
 public class ConsultaPrestamoDetalleCuotasRequest {
 
-    private Date fecha;
+    private LocalDate fecha;
 
     private Integer canal;
 

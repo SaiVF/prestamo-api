@@ -21,6 +21,7 @@ import java.sql.SQLDataException;
 import java.sql.Types;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,16 +33,16 @@ public class PrestamoRepository extends JdbcDaoSupport {
         setJdbcTemplate(jdbcTemplate);
     }
 
-    private JdbcTemplate getCheckedJdbcTemplate() throws Exception {
+    private JdbcTemplate getCheckedJdbcTemplate() {
         JdbcTemplate jdbcTemplate = getJdbcTemplate();
         if (jdbcTemplate == null) {
-            throw new Exception("Ocurrio un error");
+            throw new IllegalStateException("Ocurrio un error");
         }
         return jdbcTemplate;
     }
     public static final String SQL_OBTENER_PRESTAMO_POR_DOCUMENTO = "select pre.nro_cuenta nro_prestamo," +
             "       per.nro_documento nro_documento," +
-            "       per.nom_completo nombre_completo," +
+            "       per.nom_completo nombre_completo,a" +
             "       fue_obt_des_moneda(pre.cod_moneda) moneda" +
             "  from pr_cta_prestamos pre," +
             "       ge_cta_clientes  cli," +
@@ -74,7 +75,7 @@ public class PrestamoRepository extends JdbcDaoSupport {
 
     private static final String SQL_FECHA_APERTURA = "SELECT IT.PAG_CAL.FU_OBT_FEC_ACTUAL(1) FROM DUAL";
 
-    public DatosCliente obtenerDatoscliente(ConsultaCliente consultaCliente) throws SQLDataException {
+    public DatosCliente obtenerDatosCliente(ConsultaCliente consultaCliente) throws SQLDataException {
         String sql_datos_clientes = "{call IT.PAP_SER.PR_OBT_DAT_PERSONA(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)}";
         if (consultaCliente.getCodigoPais() == null || consultaCliente.getCodigoTipo() == null
                 || consultaCliente.getNroDocumento() == null) {
@@ -96,9 +97,13 @@ public class PrestamoRepository extends JdbcDaoSupport {
                         cStmt.setString("p_tip_operacion", consultaCliente.getTipoOperacion());
                         if (consultaCliente.getFechaNacimiento() != null) {
                             cStmt.setDate("p_fec_nacimiento", new Date(consultaCliente.getFechaNacimiento().getTime()));
+                        } else {
+                        cStmt.setNull("p_fec_nacimiento", Types.DATE);
                         }
                         if (consultaCliente.getTelefono() != null) {
                             cStmt.setString("p_telefono", consultaCliente.getTelefono());
+                        } else {
+                        cStmt.setNull("p_telefono", Types.VARCHAR);
                         }
                         cStmt.registerOutParameter("p_cod_persona", Types.VARCHAR);
                         cStmt.registerOutParameter("p_pri_nombre", Types.VARCHAR);
@@ -156,6 +161,7 @@ public class PrestamoRepository extends JdbcDaoSupport {
             return datos;
         } catch (DataAccessException e) {
             logger.error("Ocurrio un error al obtener los datos del cliente :( ", e);
+//            throw new CustomDataAccessException("Error al obtener datos del cliente", e);
             return null;
         }
     }
@@ -223,8 +229,7 @@ public class PrestamoRepository extends JdbcDaoSupport {
             String[] splitted = deudaDePrestamoString.split(";");
             DeudaVencida deudaVencida = new DeudaVencida();
             deudaVencida.setNroCuenta(splitted[0]);
-
-            deudaVencida.setNroCuota(new Integer(splitted[1]));
+            deudaVencida.setNroCuota(Integer.valueOf(splitted[1]));
 
             if (splitted[2].length() != 8) {
                 throw new SQLDataException("La fecha no se encuentra en el formato correcto");
@@ -236,7 +241,7 @@ public class PrestamoRepository extends JdbcDaoSupport {
                 logger.error("El monto no puede ser nulo, o vacio");
                 throw new SQLDataException();
             }
-            deudaVencida.setMontoTotalCobrar(new BigDecimal(splitted[3].replace(",", ".")));
+            deudaVencida.setMontoTotalCobrar(BigDecimal.valueOf(Double.parseDouble(splitted[3].replace(",", "."))));
 
             return deudaVencida;
         } catch (DataAccessException e) {
@@ -256,7 +261,7 @@ public class PrestamoRepository extends JdbcDaoSupport {
         consultaCliente.setCodigoPais(documento.getCodigoPais());
         consultaCliente.setCodigoTipo(documento.getCodigoTipoDoc());
         consultaCliente.setNroDocumento(documento.getNumeroDocumento());
-        DatosCliente datosCliente = this.obtenerDatoscliente(consultaCliente);
+        DatosCliente datosCliente = this.obtenerDatosCliente(consultaCliente);
         if (datosCliente == null) {
             throw new SQLDataException("Error al obtener datos del cliente para obtener datos de prestamo");
         }
@@ -327,7 +332,7 @@ public class PrestamoRepository extends JdbcDaoSupport {
             String cuoData = obtenerDatosCuota(request.getNumeroOperacion(), p.getNroCuota());
             String[] cuoDataSplit = cuoData.split(";");
 
-            prestamoCuotaPrevDTO.setImporteAPagar(new BigDecimal(cuoDataSplit[3].replace(",", ".")));
+            prestamoCuotaPrevDTO.setImporteAPagar(BigDecimal.valueOf(Double.parseDouble(cuoDataSplit[3].replace(",", "."))));
             prestamoCuotaDTO.setPrev(prestamoCuotaPrevDTO);
             listPmoDTO.add(prestamoCuotaDTO);
         }
@@ -370,8 +375,8 @@ public class PrestamoRepository extends JdbcDaoSupport {
         return listCuota.isEmpty() ? 0 : listCuota.get(listCuota.size() - 1).getNroCuota();
     }
 
-    public Date consultarFechaApertura() {
+    public LocalDate consultarFechaApertura() {
         logger.info("Obteniendo fecha de apertura");
-        return getJdbcTemplate().queryForObject(SQL_FECHA_APERTURA, Date.class);
+        return getJdbcTemplate().queryForObject(SQL_FECHA_APERTURA, LocalDate.class);
     }
 }
