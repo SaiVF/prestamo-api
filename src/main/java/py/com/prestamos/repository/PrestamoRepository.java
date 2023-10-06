@@ -326,7 +326,10 @@ public class PrestamoRepository extends JdbcDaoSupport {
         /*Obtenemos datos del préstamo*/
         List<DatoPrestamo> listPrestamo;
         try{
-            listPrestamo = getJdbcTemplate().query(SQL_OBTENER_PRESTAMO_POR_CUENTA, new DatoPrestamoRowMapper(), mon, mon, cuenta);
+            int[] types = {Types.VARCHAR, Types.VARCHAR, Types.INTEGER};
+            Object[] params = {mon, mon, cuenta};
+            listPrestamo = getCheckedJdbcTemplate().query(SQL_OBTENER_PRESTAMO_POR_CUENTA, params, types, new DatoPrestamoRowMapper());
+            logger.info("Lista Cuenta: "+listPrestamo);
         }catch (DataAccessException e){
             logger.error("Ocurrio un error al obtener datos de prestamo", e);
             throw new SQLDataException("Ocurrio un error al obtener datos de prestamos");
