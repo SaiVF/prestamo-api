@@ -12,9 +12,14 @@ import java.util.Date;
 @AllArgsConstructor
 public class DatoPrestamo {
     private String nroPrestamo;
+
     private String moneda;
+
     private BigDecimal montoCuota;
+
     private Date fecVencimiento;
+
     private String nroDocumento;
+
     private String nombreCompleto;
 }

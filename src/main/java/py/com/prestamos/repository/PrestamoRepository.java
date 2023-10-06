@@ -75,25 +75,6 @@ public class PrestamoRepository extends JdbcDaoSupport {
 
     private static final String SQL_FECHA_APERTURA = "SELECT IT.PAG_CAL.FU_OBT_FEC_ACTUAL(1) FROM DUAL";
 
-    public List<DatoPrestamo> getPrestamoDocumento(String codPersona, String codMoneda) {
-        try {
-
-            int[] types = {Types.VARCHAR, Types.VARCHAR, Types.VARCHAR};
-            Object[] params = {codMoneda, codMoneda, codPersona};
-
-            logger.info("Parametros de entrada");
-            logger.info("Codigo Persona: "+ codPersona);
-            logger.info("Moneda: "+ codMoneda);
-            List<DatoPrestamo> lista = getCheckedJdbcTemplate().query(SQL_OBTENER_PRESTAMO_POR_DOCUMENTO, params, types, new DatoPrestamoRowMapper());
-            logger.info("Lista Cuenta: "+lista);
-            return lista;
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
     public DatosCliente obtenerDatoscliente(ConsultaCliente consultaCliente) throws SQLDataException {
         String sql_datos_clientes = "{call IT.PAP_SER.PR_OBT_DAT_PERSONA(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)}";
         if (consultaCliente.getCodigoPais() == null || consultaCliente.getCodigoTipo() == null
@@ -270,6 +251,7 @@ public class PrestamoRepository extends JdbcDaoSupport {
         }
     }
 
+
     public OperacionesPrestamoResponse obtenerPrestamoDocumento(ConsultaPorDocumentoRequest documento, Integer moneda) throws SQLDataException {
         OperacionesPrestamoResponse operacionesPrestamoResponse = new OperacionesPrestamoResponse();
         List<PrestamoOperacionDTO> listOpDTO = new ArrayList<>();
@@ -286,10 +268,18 @@ public class PrestamoRepository extends JdbcDaoSupport {
         /* Obtenemos datos del prestamo */
         List<DatoPrestamo> listPrestamo;
         try {
-            listPrestamo = getJdbcTemplate().query(SQL_OBTENER_PRESTAMO_POR_DOCUMENTO, new DatoPrestamoRowMapper(), mon, mon, datosCliente.getCodPersona());
+            int[] types = {Types.VARCHAR, Types.VARCHAR, Types.VARCHAR};
+            Object[] params = {mon, mon, datosCliente.getCodPersona()};
+            logger.info("Parametros de entrada");
+            logger.info("Codigo Persona: "+ datosCliente.getCodPersona());
+            logger.info("Moneda: "+ mon);
+            listPrestamo = getCheckedJdbcTemplate().query(SQL_OBTENER_PRESTAMO_POR_DOCUMENTO, params, types, new DatoPrestamoRowMapper());
+            logger.info("Lista Cuenta: "+listPrestamo);
         } catch (DataAccessException e) {
             logger.error("Ocurrio un error al obtener datos de prestamo", e);
             throw new SQLDataException("Ocurrio un error al obtener datos de prestamos");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
 
         operacionesPrestamoResponse.setNombre(datosCliente.getPrimerNombre() + " " + (datosCliente.getSegundoNombre() != null ? datosCliente.getSegundoNombre() : ""));
@@ -314,6 +304,12 @@ public class PrestamoRepository extends JdbcDaoSupport {
         return operacionesPrestamoResponse;
     }
 
+    /**
+     * Metodo para calcular cuotas del Prestamo
+     *
+     * @param request
+     * @return PrestamoDetalleDTO
+     */
     public PrestamoDetalleDTO obtenerCuotasPrestamo(ConsultaPrestamoDetalleCuotasRequest request) throws Exception {
         PrestamoDetalleDTO prestamoDetalleDTO = new PrestamoDetalleDTO();
         List<PrestamoCuota> listCuota = null;

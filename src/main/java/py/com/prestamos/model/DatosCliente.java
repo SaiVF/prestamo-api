@@ -33,11 +33,9 @@ public class DatosCliente {
     @XmlElement(name = "NACIONALIDAD")
     private Integer paisNacionalidad;
 
-//    @XmlJavaTypeAdapter(DateFielcoFormatterAdapter.class)
     @XmlElement(name = "FNACIMIENTO")
     private Date fechaNacimiento;
 
-//    @XmlJavaTypeAdapter(DateFielcoFormatterAdapter.class)
     @XmlElement(name = "FVENCDOC")
     private Date fechaVencimiento;
 
