@@ -1,17 +1,13 @@
 package py.com.prestamos.response;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlElementWrapper;
-import javax.xml.bind.annotation.XmlTransient;
+import javax.xml.bind.annotation.*;
 import java.util.List;
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
+@XmlRootElement(name = "OPERACIONES")
+@XmlAccessorType(XmlAccessType.FIELD)
 public class OperacionesPrestamoResponse {
+
     @XmlElement(name = "CAB")
     private PrestamoCabeceraDTO cabecera;
 

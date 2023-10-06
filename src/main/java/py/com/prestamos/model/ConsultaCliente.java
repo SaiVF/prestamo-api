@@ -1,16 +1,15 @@
 package py.com.prestamos.model;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-
+import javax.xml.bind.annotation.XmlAccessType;
+import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
-import java.math.BigDecimal;
+import javax.xml.bind.annotation.XmlRootElement;
 import java.util.Date;
 
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
+@XmlRootElement(name = "IN")
+@XmlAccessorType(XmlAccessType.FIELD)
 public class ConsultaCliente {
     @XmlElement(name = "PAIS")
     public Integer codigoPais;

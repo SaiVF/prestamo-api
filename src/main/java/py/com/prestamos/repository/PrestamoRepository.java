@@ -11,7 +11,6 @@ import py.com.prestamos.mapper.PrestamoCuotaRowMapper;
 import py.com.prestamos.model.*;
 import py.com.prestamos.request.ConsultaPorDocumentoRequest;
 import py.com.prestamos.request.ConsultaPrestamoDetalleCuotasRequest;
-import py.com.prestamos.request.DatosClienteRequest;
 import py.com.prestamos.response.*;
 
 import javax.sql.DataSource;
@@ -169,11 +168,9 @@ public class PrestamoRepository extends JdbcDaoSupport {
                 logger.info("params: {}");
                 logger.info("COD_MONEDA_BCP: " + codMoneda);
 
-
                 CallableStatement cStmt = con.prepareCall(CALL_OBTENER_MONEDA_BCP);
                 cStmt.registerOutParameter(1, Types.VARCHAR);
                 cStmt.setInt(2, codMoneda);
-
                 return cStmt;
             }, cs -> {
                 cs.execute();
@@ -265,7 +262,6 @@ public class PrestamoRepository extends JdbcDaoSupport {
         }
         String mon = obtenerMonedaBcp(moneda);
 
-        /* Obtenemos datos del prestamo */
         List<DatoPrestamo> listPrestamo;
         try {
             int[] types = {Types.VARCHAR, Types.VARCHAR, Types.VARCHAR};
@@ -290,7 +286,7 @@ public class PrestamoRepository extends JdbcDaoSupport {
             try {
                 deudaVencida = this.getDeudaVencidaByNroCuentaAndMoneda(p.getNroPrestamo(), moneda);
             } catch (SQLDataException throwables) {
-                throw new SQLDataException("Ocurrio un error al obtener la deuda vencia");
+                throw new SQLDataException("Ocurrio un error al obtener la deuda vencida");
             }
             PrestamoOperacionDTO prestamoOperacionDTO = new PrestamoOperacionDTO();
             prestamoOperacionDTO.setNumeroOperacion(Long.valueOf(p.getNroPrestamo()));
@@ -328,7 +324,6 @@ public class PrestamoRepository extends JdbcDaoSupport {
             prestamoCuotaPrevDTO.setFechaVencimiento(p.getFecVencimiento());
             prestamoCuotaPrevDTO.setImporteAPagar(p.getMontoPagar());
 
-            /* Se obtiene el monto a Pagar */
             String cuoData = obtenerDatosCuota(request.getNumeroOperacion(), p.getNroCuota());
             String[] cuoDataSplit = cuoData.split(";");
 

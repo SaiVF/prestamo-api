@@ -1,14 +1,11 @@
 package py.com.prestamos.request;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.util.Date;
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class ConsultaPrestamoDetalleCuotasRequest {
+
     private Date fecha;
 
     private Integer canal;

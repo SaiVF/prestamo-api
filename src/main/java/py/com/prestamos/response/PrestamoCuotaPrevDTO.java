@@ -1,15 +1,10 @@
 package py.com.prestamos.response;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import javax.xml.bind.annotation.XmlElement;
 import java.math.BigDecimal;
 import java.util.Date;
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class PrestamoCuotaPrevDTO {
 
     @XmlElement(name = "Nro")

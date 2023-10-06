@@ -8,9 +8,6 @@ import py.com.prestamos.model.PrestamosPersona;
 import py.com.prestamos.request.DatosClienteRequest;
 import py.com.prestamos.service.PrestamoService;
 
-import javax.validation.Valid;
-import java.sql.SQLDataException;
-
 @Tag(name = "prestamo")
 @RestController
 @RequestMapping(value = "/")
