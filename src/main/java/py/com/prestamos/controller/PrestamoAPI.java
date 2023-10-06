@@ -17,7 +17,8 @@ import java.sql.SQLDataException;
 public class PrestamoAPI {
     @Autowired
     PrestamoService prestamoService;
-    @RequestMapping(value = "/consultar-prestamos", method = RequestMethod.GET)
+
+    @RequestMapping(value = ApiConstants.URL_MAPPING_CONSULTAR_PRESTAMOS, method = RequestMethod.GET)
     public PrestamosPersona consultarPrestamos(
             @RequestParam(value = ApiConstants.PARAM_MONEDA, required = true) Integer moneda,
             @RequestParam(value = ApiConstants.PARAM_NUMERO_DOC, required = false) String numeroDocumento,

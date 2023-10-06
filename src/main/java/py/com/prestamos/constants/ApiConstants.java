@@ -11,13 +11,13 @@ public class ApiConstants {
 
     //MAPPING
     public static final String URL_MAPPING_COBRO_PRESTAMO = "cobro-prestamos";
-    public static final String URL_MAPPING_CONSULTAR_PRESTAMOS = URL_MAPPING_COBRO_PRESTAMO +"/consultar-prestamos";
-    public static final String URL_MAPPING_COBRAR_PRESTAMO = URL_MAPPING_COBRO_PRESTAMO+"/cobrar";
+    public static final String URL_MAPPING_CONSULTAR_PRESTAMOS = "/consultar-prestamos";
+    public static final String URL_MAPPING_COBRAR_PRESTAMO = "/cobrar";
     //nuevos url para agencias con sistemas externos
-    public static final String URL_MAPPING_CONSULTAR_PRESTAMOS_EXT = URL_MAPPING_COBRO_PRESTAMO +"/ext/consultar-prestamos";
-    public static final String URL_MAPPING_COBRAR_PRESTAMO_EXT = URL_MAPPING_COBRO_PRESTAMO+"/ext/cobrar";
+    public static final String URL_MAPPING_CONSULTAR_PRESTAMOS_EXT = "/ext/consultar-prestamos";
+    public static final String URL_MAPPING_COBRAR_PRESTAMO_EXT = "/ext/cobrar";
 
-    public static final String URL_CONFIRMAR_COBRO_PRESTAMO = URL_MAPPING_COBRO_PRESTAMO +"/%s/confirmar";
+    public static final String URL_CONFIRMAR_COBRO_PRESTAMO = "/%s/confirmar";
 
     //PARAMETERS
     public static final String PARAM_BODY = "body";
