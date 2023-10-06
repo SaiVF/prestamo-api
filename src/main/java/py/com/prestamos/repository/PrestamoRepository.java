@@ -55,6 +55,22 @@ public class PrestamoRepository extends JdbcDaoSupport {
             "   and nvl(pre.en_juicio,'N') = 'N'" +
             "   and per.cod_persona = ?";
 
+    public static final String SQL_OBTENER_PRESTAMO_POR_CUENTA = "select pre.nro_cuenta nro_prestamo," +
+            "       per.nro_documento nro_documento," +
+            "       per.nom_completo nombre_completo," +
+            "       fue_obt_des_moneda(pre.cod_moneda) moneda" +
+            "  from pr_cta_prestamos pre," +
+            "       ge_cta_clientes  cli," +
+            "       ba_personas      per" +
+            " where pre.cod_modulo = 6" +
+            "   and pre.estado <> 'N'" +
+            "   and pre.nro_cuenta = cli.nro_cuenta" +
+            "   and cli.relacion = 'P'" +
+            "   and cli.cod_persona = per.cod_persona" +
+            "   and ((nvl(?, 'x') = 'x') or (pre.cod_moneda = (?)))" +
+            "   and pre.NRO_CUENTA = ?" +
+            "   and rownum = 1" +
+            "   and nvl(pre.EN_JUICIO, 'N') = 'N'";
     public static final String SQL_OBT_CUOTAS_PRESTAMO = "select to_char(cuo.nro_cuota) cuota, " +
             "cuo.fec_vencimiento fec_vto, " +
             "nvl(cuo.mto_capital, 0) + nvl(cuo.mto_interes, 0) monto_pagar " +
@@ -298,6 +314,41 @@ public class PrestamoRepository extends JdbcDaoSupport {
         }
         operacionesPrestamoResponse.setOperaciones(listOpDTO);
         return operacionesPrestamoResponse;
+    }
+
+    public OperacionesPrestamoResponse obtenerPrestamoCuenta (Integer cuenta, Integer moneda) throws Exception{
+        OperacionesPrestamoResponse operaciones = new OperacionesPrestamoResponse();
+        List<PrestamoOperacionDTO> listOpDTO = new ArrayList<>();
+
+        /*Obtenemos la moneda */
+        String mon = obtenerMonedaBcp(moneda);
+
+        /*Obtenemos datos del préstamo*/
+        List<DatoPrestamo> listPrestamo;
+        try{
+            listPrestamo = getJdbcTemplate().query(SQL_OBTENER_PRESTAMO_POR_CUENTA, new DatoPrestamoRowMapper(), mon, mon, cuenta);
+        }catch (DataAccessException e){
+            logger.error("Ocurrio un error al obtener datos de prestamo", e);
+            throw new SQLDataException("Ocurrio un error al obtener datos de prestamos");
+        }
+        for (DatoPrestamo p : listPrestamo){
+            DeudaVencida deudaVencida;
+            try{
+                deudaVencida = this.getDeudaVencidaByNroCuentaAndMoneda(p.getNroPrestamo(), moneda);
+            }catch (DataAccessException throwables){
+                throw new SQLDataException("Ocurrió un error al obtener la deuda vencida");
+            }
+            operaciones.setNombre(p.getNombreCompleto());
+            PrestamoOperacionDTO prestamoOperacionDTO = new PrestamoOperacionDTO();
+            prestamoOperacionDTO.setNumeroOperacion(Long.valueOf(p.getNroPrestamo()));
+            prestamoOperacionDTO.setMonedaLetras(p.getMoneda());
+            prestamoOperacionDTO.setMoneda(moneda);
+            prestamoOperacionDTO.setFechaVencimiento(deudaVencida.getFechaVencimiento());
+            prestamoOperacionDTO.setSaldo(deudaVencida.getMontoTotalCobrar());
+            listOpDTO.add(prestamoOperacionDTO);
+        }
+        operaciones.setOperaciones(listOpDTO);
+        return operaciones;
     }
 
     /**

@@ -91,8 +91,16 @@ public class PrestamoServiceImpl implements PrestamoService{
         return rq;
     }
     @Override
-    public PrestamosPersona consultarPrestamoCuenta(Integer cuenta, Integer moneda) {
-        return null;
+    public PrestamosPersona consultarPrestamoCuenta(Integer cuenta, Integer moneda) throws Exception{
+        try {
+            OperacionesPrestamoResponse operaciones = descartarPrestamosCanceladosAntesCierre(prestamoRepository.obtenerPrestamoCuenta(cuenta, moneda));
+            ordenarPorFechaVencimiento(operaciones.getOperaciones());
+            consultarPrestamoDetalle(operaciones);
+            return parsePrestamoPersona(operaciones);
+        }catch (Exception e){
+            log.error(e);
+            throw new Exception(e.getMessage());
+        }
     }
 
     private PrestamosPersona parsePrestamoPersona(OperacionesPrestamoResponse operaciones) {

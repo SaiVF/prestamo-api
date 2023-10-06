@@ -8,5 +8,5 @@ import java.sql.SQLDataException;
 public interface PrestamoService {
     PrestamosPersona consultarPrestamoDocumento(Integer paisDocumento, Integer tipoDocumento, String numeroDocumento, Integer moneda) throws Exception;
 
-    PrestamosPersona consultarPrestamoCuenta(Integer cuenta, Integer moneda);
+    PrestamosPersona consultarPrestamoCuenta(Integer cuenta, Integer moneda) throws Exception;
 }
