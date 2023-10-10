@@ -42,7 +42,7 @@ public class PrestamoRepository extends JdbcDaoSupport {
     }
     public static final String SQL_OBTENER_PRESTAMO_POR_DOCUMENTO = "select pre.nro_cuenta nro_prestamo," +
             "       per.nro_documento nro_documento," +
-            "       per.nom_completo nombre_completo,a" +
+            "       per.nom_completo nombre_completo," +
             "       fue_obt_des_moneda(pre.cod_moneda) moneda" +
             "  from pr_cta_prestamos pre," +
             "       ge_cta_clientes  cli," +
